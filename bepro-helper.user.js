@@ -9,7 +9,7 @@
 // @icon64      https://issta.beprotravel.com/favicon.ico
 // @homepage    https://issta.beprotravel.com/
 // @downloadURL
-// @require      file:///Users/misha/Downloads/GithubSamples/userscripts/bepro-helper.user.js
+// @require     file:///Users/misha/Downloads/GithubSamples/userscripts/bepro-helper.user.js
 // @match       *://issta.beprotravel.com/*
 // @match       *.travelbooster.com/*
 // @grant       GM_setValue
@@ -21,14 +21,33 @@
 
 (function () {
   'use strict';
+
+  let _Order;
+  const TIMEOUT = 400;
+
+  const SUPPLIERS = {
+    gogb: 'GO GLOBAL TRAVEL',
+    ean1: 'EXPEDIA',
+    ean2: 'EXPEDIA',
+    ean7: 'EXPEDIA',
+  };
+
+  const STATUSES = {
+    OK: 'OK',
+    RQ: 'Request',
+    SO: 'SoldOut',
+    XX: 'CancelledWithNoConfirm',
+    CX: 'CancelledWithConfirm',
+  };
+
   // for local debug
   // @require      file:///Users/misha/Downloads/GithubSamples/userscripts/bepro-helper.user.js
 
   // ===== UTILS =====
+  const sleep = (ms = TIMEOUT) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
   const isBeProSite = () => location.href.includes('beprotravel');
   const isTravelBoosterSite = () => location.href.includes('travelbooster');
-  const isTransactionPage = () =>
-    location.href.includes('EditTransaction.aspx');
   const isEmptyObject = (obj) =>
     obj == null ||
     (obj && obj.constructor === Object && Object.keys(obj).length === 0);
@@ -55,37 +74,19 @@
   };
   // ===== UTILS =====
 
-  let _Order;
-  const TIMEOUT = 400;
-  let _CommandId;
-
-  const SUPPLIERS = {
-    gogb: 'GO GLOBAL TRAVEL',
-    ean1: 'EXPEDIA',
-    ean2: 'EXPEDIA',
-    ean7: 'EXPEDIA',
-  };
-
-  const STATUSES = {
-    OK: 'OK',
-    RQ: 'Request',
-    SO: 'SoldOut',
-    XX: 'CancelledWithNoConfirm',
-    CX: 'CancelledWithConfirm',
-  };
-
   init();
 
-  function init() {
+  async function init() {
     initBeProSite();
-    initTravelBooster();
-
     loadOrderFromStorage();
+    await initTravelBooster();
+
     if (isNotEmptyObject(_Order)) {
       const { OrderSegId } = _Order;
 
       // GM_registerMenuCommand(`Load Order #${OrderSegId}`, loadOrderFromStorage);
-      GM_registerMenuCommand(`Hotel Details #${OrderSegId}`, fillHotelDetails);
+      GM_registerMenuCommand(`Fill Details #${OrderSegId}`, fillHotelDetails);
+      GM_registerMenuCommand(`See Details #${OrderSegId}`, seeHotelDetails);
     }
   }
 
@@ -95,9 +96,10 @@
         "<button id='MakeLink' class='btn btn-xs btn-warning margin-top-5'>Make Link</button>"
       );
 
-      $('#MakeLink').click(function () {
+      $('#MakeLink').click(() => {
         if (isNotEmptyObject(NC.Widgets.B2B.MyOrdersWidget._CurrentOrder)) {
           _Order = NC.Widgets.B2B.MyOrdersWidget._CurrentOrder;
+          console.log(_Order);
           //RegisterCommand(_Order.OrderRow.SegmentId);
           NC.Widgets.B2B.Utils.SmallSuccessBox(
             'Order Remembered Successfully: ' + _Order.OrderRow.SegmentId
@@ -115,28 +117,59 @@
 
   function makeTravelBoosterUrl() {
     if (isNotEmptyObject(_Order)) {
-      const segment = _Order.Order.Segments[0];
+      const [segment] = _Order.Order.Segments;
+      const {
+        OrderSegId,
+        SuppPnr,
+        ItemDesc,
+        ItemStarRateCode,
+        RoomsStatusCode,
+        CheckIn,
+        CheckOut,
+        RoomsFirstCXL,
+        SysTotalGross,
+        SysTotalGross2,
+        SysSuppCode,
+        Rooms,
+        SysCurrencyCode,
+        NumberOfNights,
+        ItemAddress,
+        SuppCityDesc,
+        ItemPhone,
+        ItemFax,
+        ItemZip,
+      } = segment;
+      const Paxes = _Order.Order.Paxes.map((p) => ({
+        Country: p.Country,
+        DOB: p.DOB,
+        FirstName: p.FirstName,
+        LastName: p.LastName,
+        Gender: p.Gender,
+        PaxTitle: p.PaxTitle,
+        Mobile1: p.Mobile1,
+        Phone1: p.Phone1,
+      }));
       const miniOrder = {
-        OrderSegId: segment.OrderSegId,
-        SuppPnr: segment.SuppPnr,
-        ItemDesc: segment.ItemDesc,
-        ItemStarRateCode: segment.ItemStarRateCode,
-        RoomsStatusCode: segment.RoomsStatusCode,
-        CheckIn: segment.CheckIn,
-        CheckOut: segment.CheckOut,
-        RoomsFirstCXL: segment.RoomsFirstCXL,
-        SysTotalGross: segment.SysTotalGross,
-        SysTotalGross2: segment.SysTotalGross2,
-        SysSuppCode: segment.SysSuppCode,
-        SysBasisCode: segment.Rooms[0].SysBasisCode,
-        SysCurrencyCode: segment.SysCurrencyCode,
-        SysTotalGross2: segment.SysTotalGross2,
-        NumberOfNights: segment.NumberOfNights,
-        ItemAddress: segment.ItemAddress,
-        SuppCityDesc: segment.SuppCityDesc,
-        ItemPhone: segment.ItemPhone,
-        ItemFax: segment.ItemFax,
-        ItemZip: segment.ItemZip,
+        OrderSegId,
+        SuppPnr,
+        ItemDesc,
+        ItemStarRateCode,
+        RoomsStatusCode,
+        CheckIn,
+        CheckOut,
+        RoomsFirstCXL,
+        SysTotalGross,
+        SysTotalGross2,
+        SysSuppCode,
+        SysBasisCode: Rooms[0].SysBasisCode,
+        SysCurrencyCode,
+        NumberOfNights,
+        ItemAddress,
+        SuppCityDesc,
+        ItemPhone,
+        ItemFax,
+        ItemZip,
+        Paxes,
       };
 
       const queryString = `Order=${encodeURIComponent(
@@ -156,56 +189,91 @@
     }
   }
 
-  function initTravelBooster() {
+  async function initTravelBooster() {
     if (isTravelBoosterSite()) {
       saveOrderFromQueryStringToStorage();
+      await sleep();
+      addButtons();
     }
   }
 
-  function fillHotelDetails() {
+  function addButtons() {
+    if (!jQuery || !jQuery().jquery) {
+      return;
+    }
+
+    const order = JSON.stringify(_Order, null, 2);
+    jQuery('[id*=tabControlMain_G2Panel2').before(
+      `<br/>
+      <details>
+          <summary>Details #${_Order.OrderSegId}</summary>
+          <pre>${order}</pre>
+       </details>`
+    );
+    jQuery('[id*=frmTransact_btnContinue').before(
+      `<input type="button" id="FillDetails" class="button marginAltSide10"
+          style="background-color: #356e35"
+          value="Fill"
+       />`
+    );
+    jQuery('#FillDetails').click(fillHotelDetails);
+  }
+
+  function seeHotelDetails() {
+    const order = _Order || 'No Order Details';
+    alert(JSON.stringify(order, null, 2));
+  }
+
+  async function fillHotelDetails() {
     if (isTravelBoosterSite() && isNotEmptyObject(_Order)) {
       fillGeneralDetails();
       fillDates();
       fillReservation();
       fillAddress();
 
-      setTimeout(showPricingTab, 1000);
+      await sleep(1000);
+      showPricingTab();
     }
   }
 
-  function showPricingTab() {
+  async function showPricingTab() {
     jQuery('[id*=tabPassengers_A]').trigger(jQuery.Event('click'));
-    addCurrency();
+    await addPax();
   }
 
-  function AddPax() {
+  async function addPax() {
     jQuery('[id*=dlCustomers_ctl01_chkSelected]')
       .prop('checked', true)
       .trigger(jQuery.Event('change'));
-    setTimeout(addCurrency, TIMEOUT);
+    await sleep();
+    await addCurrency();
   }
 
-  function addPrice() {
-    const { SysTotalGross, SysTotalGross2, OrderSegId } = _Order;
-
-    jQuery('[id*=editCustomers_dlCustomers_ctl01_txtNet]')
-      .val(SysTotalGross)
-      .trigger(jQuery.Event('change'));
-    jQuery('[id*=editCustomers_dlCustomers_ctl01_txtSellPrice]')
-      .val(SysTotalGross2)
-      .trigger(jQuery.Event('change'));
-
-    alert(`Finish To Fill Order: #${OrderSegId}`);
-  }
-
-  function addCurrency() {
-    const { SysCurrencyCode = 'ttt' } = _Order;
+  async function addCurrency() {
+    const { SysCurrencyCode = 'USD' } = _Order;
 
     jQuery('[id*=editCustomers_frmTransact_ddlCurrency]')
       .val(SysCurrencyCode)
       .trigger(jQuery.Event('change'));
 
-    setTimeout(addPrice, TIMEOUT);
+    await sleep();
+    await addPrice();
+    await sleep();
+    await addPrice();
+  }
+
+  async function addPrice() {
+    const { SysTotalGross, SysTotalGross2, OrderSegId } = _Order;
+
+    jQuery('[id*=ctl01_txtNet]')
+      .val(SysTotalGross)
+      .trigger(jQuery.Event('change'));
+    jQuery('[id*=ctl01_txtSellPrice]')
+      .val(SysTotalGross2)
+      .trigger(jQuery.Event('change'));
+
+    // jQuery('[id*=frmTransact_btnContinue').click();
+    console.log(`Finish To Fill Order: #${OrderSegId}`);
   }
 
   function saveOrderFromQueryStringToStorage() {
@@ -241,6 +309,7 @@
 
   function fillDestination() {
     jQuery('[id*=cbAreas_tbAutoComplete]').val(_Order.SuppCityDesc);
+    // jQuery('[id*=cbAreas_hfAutoComplete]').val(_Order.SuppCityDesc);
   }
 
   function fillDates() {
@@ -291,24 +360,10 @@
     jQuery('[id*=tabControlMain_txtFax]').val(ItemFax);
   }
 
-  function RegisterCommand(segmentId) {
-    _CommandId = GM_registerMenuCommand(
-      `Fill Order Info #${segmentId}`,
-      fillOrderInfo
-    );
-  }
-
-  function fillOrderInfo() {
-    //console.log(_Order);
-    GM_unregisterMenuCommand(_CommandId);
-    SaveToStorage();
-    NC.Widgets.B2B.Utils.SmallSuccessBox('Saved to storage');
-  }
-
   function saveOrderToStorage() {
     if (isNotEmptyObject(_Order)) {
       GM_setValue('Order', JSON.stringify(_Order));
-      // alert('Order Saved Successfully', _Order.OrderSegId);
+      // console.log('Order Saved Successfully', _Order.OrderSegId);
     }
   }
 
