@@ -1,15 +1,13 @@
 // ==UserScript==
 // @name        BePro Global Export
 // @namespace   https://issta.beprotravel.com/
-// @version     1.0
+// @version     1.0.0
 // @description This userscript send help to fill some order information in external systems
 // @author      Misha Kav
-// @copyright   2017, Misha Kav by BePro Travel LTD.
-// @icon        https://ofisstaakim.beprotravel.net/favicon.ico
+// @copyright   2022, Misha Kav
+// @icon        https://issta.beprotravel.com/favicon.ico
 // @icon64      https://issta.beprotravel.com/favicon.ico
 // @homepage    https://issta.beprotravel.com/
-// @downloadURL
-// @require     file:///Users/misha/Downloads/GithubSamples/userscripts/bepro-helper.user.js
 // @match       *://issta.beprotravel.com/*
 // @match       *.travelbooster.com/*
 // @grant       GM_setValue
@@ -17,6 +15,9 @@
 // @grant       GM_registerMenuCommand
 // @grant       GM_unregisterMenuCommand
 // @run-at      document-end
+// @updateURL    https://raw.githubusercontent.com/MishaKav/userscripts/main/bepro-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/MishaKav/userscripts/main/bepro-helper.user.js
+// @supportURL   https://github.com/MishaKav/userscripts/issues
 // ==/UserScript==
 
 (function () {
