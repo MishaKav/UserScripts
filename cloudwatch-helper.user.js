@@ -64,7 +64,8 @@
     'START RequestId',
     'END RequestId',
     'REPORT RequestId',
-    'otel-extension State', // serverless
+    'LOGS Name: otel-extension State', // serverless
+    'EXTENSION Name: otel-extension State', // serverless
   ];
 
   const isLogGroupPage = () => location.href.includes('/log-group/');
