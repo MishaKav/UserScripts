@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CloudWatch Helper
 // @namespace    https://github.com/MishaKav/userscripts/cloudwatch-helper
-// @version      1.1.1
+// @version      1.1.2
 // @description  A userscript that adds ability to Hide Noise, Highlight the log level, Format the date and show message inside sns in json format
 // @author       Misha Kav
 // @copyright    2021, Misha Kav
